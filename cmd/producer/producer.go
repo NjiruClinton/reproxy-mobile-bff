@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"strconv"
 
 	"github.com/IBM/sarama"
@@ -14,9 +15,9 @@ import (
 )
 
 const (
-	ProducerPort        = ":8080"
-	KafkaServiceAddress = "localhost:9092"
-	KafkaTopic          = "notifications"
+	ProducerPort       = ":8080"
+	KafkaServerAddress = "localhost:9092"
+	KafkaTopic         = "notifications"
 )
 
 var ErrUserNotFoundInProducer = errors.New("user not found")
@@ -71,10 +72,40 @@ func sendKafkaMessage(producer sarama.SyncProducer, users []models.User, ctx *gi
 	return err
 }
 
+func sendMessageHandler(producer sarama.SyncProducer, users []models.User) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		fromID, err := getIDFromRequest("fromID", ctx)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+			return
+		}
+
+		toID, err := getIDFromRequest("toID", ctx)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+			return
+		}
+
+		err = sendKafkaMessage(producer, users, ctx, fromID, toID)
+		if errors.Is(err, ErrUserNotFoundInProducer) {
+			ctx.JSON(http.StatusNotFound, gin.H{"message": "User not found"})
+			return
+		}
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{
+				"message": err.Error(),
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{"message": "Notification sent successfully!"})
+	}
+}
+
 func setupProducer() (sarama.SyncProducer, error) {
 	config := sarama.NewConfig()
 	config.Producer.Return.Successes = true
-	producer, err := sarama.NewSyncProducer([]string{KafkaServiceAddress}, config)
+	producer, err := sarama.NewSyncProducer([]string{KafkaServerAddress}, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup producer: %w", err)
 	}
@@ -99,7 +130,7 @@ func main() {
 	router := gin.Default()
 	router.POST("/send", sendMessageHandler(producer, users))
 
-	fmt.Printf("Kafka PRODUCER started at http:localhost:%s\n", ProducerPort)
+	fmt.Printf("Kafka PRODUCER 📨 started at http://localhost:%s\n", ProducerPort)
 
 	if err := router.Run(ProducerPort); err != nil {
 		log.Printf("failed to run the server: %v", err)
