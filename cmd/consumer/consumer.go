@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	ConsumerGroup       = "notifications-group"
-	ConsumerTopic       = "notifications"
-	ConsumerPort        = ":8081"
-	KafkaServiceAddress = "localhost:9092"
+	ConsumerGroup      = "notifications-group"
+	ConsumerTopic      = "notifications"
+	ConsumerPort       = ":8081"
+	KafkaServerAddress = "localhost:9092"
 )
 
 var ErrNoMessagesFound = errors.New("no messages found")
@@ -45,8 +45,8 @@ func (ns *NotificationStore) Add(userID string, notification models.Notification
 }
 
 func (ns *NotificationStore) Get(userID string) []models.Notification {
-	ns.mu.Lock()
-	defer ns.mu.Unlock()
+	ns.mu.RLock()
+	defer ns.mu.RUnlock()
 	return ns.data[userID]
 }
 
@@ -54,10 +54,10 @@ type Consumer struct {
 	store *NotificationStore
 }
 
-func (*Consumer) Setup(group sarama.ConsumerGroupSession) error   { return nil }
-func (*Consumer) Cleanup(group sarama.ConsumerGroupSession) error { return nil }
+func (*Consumer) Setup(sarama.ConsumerGroupSession) error   { return nil }
+func (*Consumer) Cleanup(sarama.ConsumerGroupSession) error { return nil }
 
-func (consumer *Consumer) ConsumerClaim(sess sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+func (consumer *Consumer) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for msg := range claim.Messages() {
 		userID := string(msg.Key)
 		var notification models.Notification
@@ -75,7 +75,7 @@ func (consumer *Consumer) ConsumerClaim(sess sarama.ConsumerGroupSession, claim 
 func initializeConsumerGroup() (sarama.ConsumerGroup, error) {
 	config := sarama.NewConfig()
 
-	consumerGroup, err := sarama.NewConsumerGroup([]string{KafkaServiceAddress}, ConsumerGroup, config)
+	consumerGroup, err := sarama.NewConsumerGroup([]string{KafkaServerAddress}, ConsumerGroup, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize consumer group: %w", err)
 	}
@@ -85,7 +85,7 @@ func initializeConsumerGroup() (sarama.ConsumerGroup, error) {
 func setupConsumerGroup(ctx context.Context, store *NotificationStore) {
 	consumerGroup, err := initializeConsumerGroup()
 	if err != nil {
-		log.Fatalf("initializatioon error: %v", err)
+		log.Printf("initializatioon error: %v", err)
 	}
 	defer consumerGroup.Close()
 
