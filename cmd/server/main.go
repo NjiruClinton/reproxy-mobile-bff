@@ -31,7 +31,7 @@ func initEnvs(wg *sync.WaitGroup) {
 func initServer() {
 	r := mux.NewRouter()
 
-	r.HandleFunc("/login", handleLogin).Methods("POST")
+	//r.HandleFunc("/login", handleLogin).Methods("POST")
 
 	log.Fatal(http.ListenAndServe(":4100", r))
 }

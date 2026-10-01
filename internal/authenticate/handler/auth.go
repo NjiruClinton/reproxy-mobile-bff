@@ -13,7 +13,7 @@ type loginRequest struct {
 }
 
 type Auth struct {
-	cfg *config.Config
+	//cfg *config.Config
 }
 
 func (a *Auth) login(w http.ResponseWriter, r *http.Request) {
@@ -28,5 +28,5 @@ func (a *Auth) login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Email and password are required.", initializations.CODE_BAD_REQUEST)
 	}
 
-	loginResp, err := gql.Do[loginData](r.Context(), a.gql)
+	//loginResp, err := gql.Do[loginData](r.Context(), a.gql)
 }
