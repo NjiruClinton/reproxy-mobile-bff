@@ -1,0 +1,2 @@
+make run-containers
+make run-proxy-server
